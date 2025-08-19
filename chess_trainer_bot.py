@@ -376,6 +376,9 @@ def analyze_and_store(conn: sqlite3.Connection, games: List[chess.pgn.Game], use
                 info_before = analyze_position(eng, board, depth, movetime)
                 eval_before = cp_from_info(info_before)
 
+            # Записываем FEN ДО хода
+            fen_before = board.fen()
+            
             # timing
             comment = next_node.comment
             clk_after = parse_clock(comment)
@@ -383,8 +386,6 @@ def analyze_and_store(conn: sqlite3.Connection, games: List[chess.pgn.Game], use
             if clk_after is not None and last_clock[side] is not None:
                 dt = last_clock[side] - clk_after
                 if dt >= 0: time_spent = dt
-
-            fen_before = board.fen()
 
             # push
             board.push(move)
@@ -836,6 +837,9 @@ class ChessBot:
                 info_before = await self.engine.analyse(board, chess.engine.Limit(depth=depth))
                 eval_before = cp_from_info(info_before)
 
+                # Записываем FEN ДО хода
+                fen_before = board.fen()
+                
                 # timing
                 comment = next_node.comment
                 clk_after = parse_clock(comment)
@@ -844,7 +848,7 @@ class ChessBot:
                     dt = last_clock[side] - clk_after
                     if dt >= 0: time_spent = dt
 
-                fen_before = board.fen()
+                # Делаем ход
                 board.push(move)
 
                 # AFTER eval
