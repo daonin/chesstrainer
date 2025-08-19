@@ -1065,7 +1065,7 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def update_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Команда /update - обновление базы данных"""
-    user_id = update.from_user.id
+    user_id = update.message.from_user.id
     
     # Извлекаем параметры из команды
     args = context.args
