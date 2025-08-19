@@ -184,9 +184,6 @@ def init_engine(path: str) -> Optional[chess.engine.SimpleEngine]:
 
 async def init_engine_async(path: str) -> Optional[chess.engine.SimpleEngine]:
     """Асинхронная инициализация движка"""
-    print(f"[DEBUG] Attempting to initialize engine at: {path}")
-    print(f"[DEBUG] Path exists: {os.path.exists(path) if path else 'No path provided'}")
-    
     if not path:
         print("[WARN] No Stockfish path provided")
         return None
@@ -204,9 +201,7 @@ async def init_engine_async(path: str) -> Optional[chess.engine.SimpleEngine]:
             return None
     
     try:
-        print(f"[DEBUG] Attempting to start engine at: {path}")
         transport, eng = await chess.engine.popen_uci(path)
-        print(f"[DEBUG] Engine started, configuring...")
         await eng.configure({"Threads": 1, "Hash": 64})
         print(f"[INFO] Stockfish initialized async: {eng.id}")
         # Store transport in engine for cleanup
@@ -318,16 +313,10 @@ def pv_to_san(board_before: chess.Board, pv_moves) -> Tuple[str, str]:
     b = board_before.copy()
     san_list = []
     best_san = None
-    
-    print(f"[DEBUG] pv_to_san: board_fen={b.fen()}")
-    print(f"[DEBUG] pv_to_san: pv_moves={pv_moves}")
-    
     for i, mv in enumerate(pv_moves):
         try:
-            print(f"[DEBUG] pv_to_san: move {i}: {mv}, legal_moves: {list(b.legal_moves)}")
             san = b.san(mv)
-        except Exception as e:
-            print(f"[DEBUG] pv_to_san: Failed to convert move {mv}: {e}")
+        except Exception:
             break
         san_list.append(san)
         if i==0: best_san = san
