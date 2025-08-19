@@ -26,7 +26,8 @@ RUN mkdir -p /data
 
 # Создаем непривилегированного пользователя
 RUN useradd -r -s /bin/false -m -d /app chess && \
-    chown -R chess:chess /app /data
+    chown -R chess:chess /app /data && \
+    chmod +x /usr/games/stockfish
 
 USER chess
 

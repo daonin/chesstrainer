@@ -184,16 +184,38 @@ def init_engine(path: str) -> Optional[chess.engine.SimpleEngine]:
 
 async def init_engine_async(path: str) -> Optional[chess.engine.SimpleEngine]:
     """Асинхронная инициализация движка"""
-    if not path or not os.path.exists(path):
-        print(f"[WARN] Stockfish not found at '{path}'")
+    print(f"[DEBUG] Attempting to initialize engine at: {path}")
+    print(f"[DEBUG] Path exists: {os.path.exists(path) if path else 'No path provided'}")
+    
+    if not path:
+        print("[WARN] No Stockfish path provided")
         return None
+        
+    if not os.path.exists(path):
+        print(f"[WARN] Stockfish not found at '{path}'")
+        # Try common locations
+        common_paths = ['/usr/bin/stockfish', '/usr/games/stockfish', '/usr/local/bin/stockfish']
+        for alt_path in common_paths:
+            if os.path.exists(alt_path):
+                print(f"[INFO] Found Stockfish at alternative location: {alt_path}")
+                path = alt_path
+                break
+        else:
+            return None
+    
     try:
-        eng = await chess.engine.SimpleEngine.popen_uci(path)
+        print(f"[DEBUG] Attempting to start engine at: {path}")
+        transport, eng = await chess.engine.popen_uci(path)
+        print(f"[DEBUG] Engine started, configuring...")
         await eng.configure({"Threads": 1, "Hash": 64})
         print(f"[INFO] Stockfish initialized async: {eng.id}")
+        # Store transport in engine for cleanup
+        eng._transport = transport
         return eng
     except Exception as e:
         print(f"[WARN] Cannot start engine async '{path}': {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 # ---------- TRAINER FUNCTIONS ----------
@@ -481,7 +503,16 @@ class ChessBot:
     async def cleanup(self):
         """Закрытие движка"""
         if self.engine:
-            await self.engine.quit()
+            try:
+                await self.engine.quit()
+            except:
+                pass
+            # Close transport if stored
+            if hasattr(self.engine, '_transport'):
+                try:
+                    self.engine._transport.close()
+                except:
+                    pass
 
     def get_drill_query(self, difficulty: str = "medium", limit: int = 20) -> str:
         """SQL запрос для получения дриллов"""
@@ -1137,7 +1168,7 @@ def parse_args():
     ap.add_argument("--db-path", default=DB_PATH, help="SQLite database path")
     return ap.parse_args()
 
-async def run_bot(args):
+def run_bot(args):
     """Запуск Telegram бота"""
     if not TELEGRAM_AVAILABLE:
         print("[ERROR] Telegram dependencies not available. Install: pip install python-telegram-bot Pillow")
@@ -1171,21 +1202,26 @@ async def run_bot(args):
     app.add_handler(CallbackQueryHandler(drill_callback, pattern="^drill_"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_answer))
     
-    # Инициализация движка
-    engine_ok = await bot.init_engine()
-    if not engine_ok:
-        print("[WARN] Engine not available - /update command will not work")
+    async def post_init(application):
+        """Инициализация после создания приложения"""
+        engine_ok = await bot.init_engine()
+        if not engine_ok:
+            print("[WARN] Engine not available - /update command will not work")
     
-    try:
-        print("[INFO] Bot is running! Press Ctrl+C to stop.")
-        await app.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
-    finally:
+    async def post_stop(application):
+        """Очистка при остановке"""
         await bot.cleanup()
+    
+    app.post_init = post_init
+    app.post_stop = post_stop
+    
+    print("[INFO] Bot is running! Press Ctrl+C to stop.")
+    app.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
 
 def main():
     """Главная функция"""
     args = parse_args()
-    asyncio.run(run_bot(args))
+    run_bot(args)
 
 if __name__ == "__main__":
     main()
