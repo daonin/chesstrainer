@@ -318,10 +318,16 @@ def pv_to_san(board_before: chess.Board, pv_moves) -> Tuple[str, str]:
     b = board_before.copy()
     san_list = []
     best_san = None
+    
+    print(f"[DEBUG] pv_to_san: board_fen={b.fen()}")
+    print(f"[DEBUG] pv_to_san: pv_moves={pv_moves}")
+    
     for i, mv in enumerate(pv_moves):
         try:
+            print(f"[DEBUG] pv_to_san: move {i}: {mv}, legal_moves: {list(b.legal_moves)}")
             san = b.san(mv)
-        except Exception:
+        except Exception as e:
+            print(f"[DEBUG] pv_to_san: Failed to convert move {mv}: {e}")
             break
         san_list.append(san)
         if i==0: best_san = san
@@ -840,6 +846,9 @@ class ChessBot:
                 # Записываем FEN ДО хода
                 fen_before = board.fen()
                 
+                print(f"[DEBUG] ply={ply}, san={san}, fen_before={fen_before}")
+                print(f"[DEBUG] move={move}, legal_moves={list(board.legal_moves)}")
+                
                 # timing
                 comment = next_node.comment
                 clk_after = parse_clock(comment)
@@ -849,7 +858,11 @@ class ChessBot:
                     if dt >= 0: time_spent = dt
 
                 # Делаем ход
-                board.push(move)
+                try:
+                    board.push(move)
+                except Exception as e:
+                    print(f"[ERROR] Cannot push move {move} ({san}) on board {fen_before}: {e}")
+                    break
 
                 # AFTER eval
                 info_after = await self.engine.analyse(board, chess.engine.Limit(depth=depth))
