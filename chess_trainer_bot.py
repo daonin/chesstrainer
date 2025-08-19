@@ -365,7 +365,6 @@ def analyze_and_store(conn: sqlite3.Connection, games: List[chess.pgn.Game], use
 
         while node.variations:
             next_node = node.variation(0)
-            move = next_node.move
             san = next_node.san()
             ply += 1
 
@@ -385,6 +384,13 @@ def analyze_and_store(conn: sqlite3.Connection, games: List[chess.pgn.Game], use
             # Записываем FEN ДО хода
             fen_before = board.fen()
             
+            # Получаем ход из SAN для текущей позиции
+            try:
+                move = board.parse_san(san)
+            except ValueError as e:
+                print(f"[ERROR] Cannot parse SAN '{san}' for position {fen_before}: {e}")
+                break
+            
             # timing
             comment = next_node.comment
             clk_after = parse_clock(comment)
@@ -395,6 +401,9 @@ def analyze_and_store(conn: sqlite3.Connection, games: List[chess.pgn.Game], use
 
             # push
             board.push(move)
+            
+            # Переходим к следующему узлу
+            node = next_node
 
             # AFTER eval
             eval_after = None
@@ -833,7 +842,6 @@ class ChessBot:
 
             while node.variations and eval_used < max_positions:
                 next_node = node.variation(0)
-                move = next_node.move
                 san = next_node.san()
                 ply += 1
 
@@ -853,8 +861,14 @@ class ChessBot:
                 # Записываем FEN ДО хода
                 fen_before = board.fen()
                 
-                print(f"[DEBUG] ply={ply}, san={san}, fen_before={fen_before}")
-                print(f"[DEBUG] move={move}, legal_moves={list(board.legal_moves)}")
+                # Получаем ход из SAN для текущей позиции
+                try:
+                    move = board.parse_san(san)
+                except ValueError as e:
+                    print(f"[ERROR] Cannot parse SAN '{san}' for position {fen_before}: {e}")
+                    break
+                
+                print(f"[DEBUG] ply={ply}, san={san}, move={move}, fen_before={fen_before}")
                 
                 # timing
                 comment = next_node.comment
@@ -865,11 +879,10 @@ class ChessBot:
                     if dt >= 0: time_spent = dt
 
                 # Делаем ход
-                try:
-                    board.push(move)
-                except Exception as e:
-                    print(f"[ERROR] Cannot push move {move} ({san}) on board {fen_before}: {e}")
-                    break
+                board.push(move)
+                
+                # Переходим к следующему узлу
+                node = next_node
 
                 # AFTER eval
                 info_after = await self.engine.analyse(board, chess.engine.Limit(depth=depth))
