@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  chess-trainer-bot:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: chess-trainer-bot
+    restart: unless-stopped
+    
+    # Переменные окружения
+    environment:
+      # ОБЯЗАТЕЛЬНАЯ - токен Telegram бота
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      
+      # Python настройки
+      PYTHONUNBUFFERED: 1
+    
+    # Постоянное хранение данных
+    volumes:
+      - chess_data:/data
+    
+    # Логирование
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    
+    # Лимиты ресурсов
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+    
+    # Проверка здоровья
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sqlite3; sqlite3.connect('/data/trainer_output.sqlite').close()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+# Постоянные тома
+volumes:
+  chess_data:
+    driver: local
+    # Опционально: можно указать путь на хосте
+    # driver_opts:
+    #   type: none
+    #   o: bind
+    #   device: /path/to/your/chess/data
+
+# Сети (по умолчанию достаточно default)
+networks:
+  default:
+    name: chess-trainer-network
