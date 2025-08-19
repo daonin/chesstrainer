@@ -798,7 +798,7 @@ class ChessBot:
     
     async def _analyze_games_async(self, conn, games, username, run_id, depth, max_positions, progress_callback, force_reanalyze: bool = False):
         """Асинхронный анализ партий с прогрессом"""
-        print(f"[DEBUG] Starting analysis: engine={self.engine is not None}, games={len(games)}, depth={depth}")
+
         cur = conn.cursor()
         eval_used = 0
         analyzed_games = 0
@@ -853,10 +853,8 @@ class ChessBot:
                     print(f"[ERROR] Engine not available for analysis at ply {ply}")
                     break
                     
-                print(f"[DEBUG] Analyzing position {ply}: {board.fen()}")
                 info_before = await self.engine.analyse(board, chess.engine.Limit(depth=depth))
                 eval_before = cp_from_info(info_before)
-                print(f"[DEBUG] Analysis result: {eval_before} cp")
 
                 # Записываем FEN ДО хода
                 fen_before = board.fen()
@@ -867,8 +865,6 @@ class ChessBot:
                 except ValueError as e:
                     print(f"[ERROR] Cannot parse SAN '{san}' for position {fen_before}: {e}")
                     break
-                
-                print(f"[DEBUG] ply={ply}, san={san}, move={move}, fen_before={fen_before}")
                 
                 # timing
                 comment = next_node.comment
