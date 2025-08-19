@@ -428,7 +428,9 @@ def analyze_and_store(conn: sqlite3.Connection, games: List[chess.pgn.Game], use
                 engine_best_san = None
                 pv_best = "[]"
                 if info_before and "pv" in info_before and info_before["pv"]:
-                    engine_best_san, pv_best = pv_to_san(chess.Board(fen_before), info_before["pv"])
+                    # Создаем новую доску из FEN до хода для анализа PV
+                    board_for_pv = chess.Board(fen_before)
+                    engine_best_san, pv_best = pv_to_san(board_for_pv, info_before["pv"])
 
                 # severity ranking
                 if cp_loss is not None and cp_loss >= SEVERE_BLUNDER_CP:
@@ -880,7 +882,9 @@ class ChessBot:
                     engine_best_san = None
                     pv_best = "[]"
                     if info_before and "pv" in info_before and info_before["pv"]:
-                        engine_best_san, pv_best = pv_to_san(chess.Board(fen_before), info_before["pv"])
+                        # Создаем доску из FEN до хода для анализа PV
+                        board_for_pv = chess.Board(fen_before)
+                        engine_best_san, pv_best = pv_to_san(board_for_pv, info_before["pv"])
 
                     # severity ranking
                     if cp_loss is not None and cp_loss >= SEVERE_BLUNDER_CP:
