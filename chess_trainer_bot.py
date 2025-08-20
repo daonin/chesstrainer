@@ -547,20 +547,37 @@ class ChessBot:
             columns = [desc[0] for desc in cursor.description]
             return [dict(zip(columns, row)) for row in cursor.fetchall()]
 
-    def render_board_png(self, fen: str) -> bytes:
+    def render_board_png(self, fen: str, last_move_san: str = None, side: str = "W") -> bytes:
         """Генерация PNG изображения доски из FEN"""
         try:
             board = chess.Board(fen)
+            
+            # Определяем последний ход если передан
+            last_move = None
+            if last_move_san:
+                try:
+                    # Создаем временную доску для парсинга хода
+                    temp_board = chess.Board(fen)
+                    temp_board.pop()  # Откатываем последний ход
+                    last_move = temp_board.parse_san(last_move_san)
+                except:
+                    pass
+            
+            # Поворачиваем доску если ходят черные
+            flipped = (side == "B")
             
             # Генерируем SVG
             svg_data = chess.svg.board(
                 board, 
                 size=BOARD_SIZE,
                 coordinates=True,
+                flipped=flipped,
+                lastmove=last_move,
                 style="""
                 .square.light { fill: #f0d9b5; }
                 .square.dark { fill: #b58863; }
                 .coord { font-size: 14px; font-family: Arial; }
+                .square.lastmove { fill: rgba(255, 255, 0, 0.4); }
                 """
             )
             
@@ -569,13 +586,13 @@ class ChessBot:
                 png_data = cairosvg.svg2png(bytestring=svg_data.encode('utf-8'))
                 return png_data
             else:
-                return self._render_simple_board(board)
+                return self._render_simple_board(board, flipped)
                 
         except Exception as e:
             print(f"[ERROR] Board rendering failed: {e}")
             return self._create_error_image()
 
-    def _render_simple_board(self, board: chess.Board) -> bytes:
+    def _render_simple_board(self, board: chess.Board, flipped: bool = False) -> bytes:
         """Простая отрисовка доски без SVG"""
         if not TELEGRAM_AVAILABLE:
             return b''
@@ -588,8 +605,12 @@ class ChessBot:
         # Рисуем клетки
         for rank in range(8):
             for file in range(8):
-                x1 = file * square_size
-                y1 = (7-rank) * square_size
+                # Поворачиваем координаты если нужно
+                display_rank = 7 - rank if flipped else rank
+                display_file = 7 - file if flipped else file
+                
+                x1 = display_file * square_size
+                y1 = (7 - display_rank) * square_size
                 x2 = x1 + square_size
                 y2 = y1 + square_size
                 
@@ -981,7 +1002,15 @@ async def drill_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = query.from_user.id
         bot.user_sessions[user_id] = drill
         
-        png_data = bot.render_board_png(drill['fen_before'])
+        # Определяем сторону которая должна ходить
+        board = chess.Board(drill['fen_before'])
+        current_side = "W" if board.turn == chess.WHITE else "B"
+        
+        png_data = bot.render_board_png(
+            drill['fen_before'], 
+            drill.get('san_played'),  # последний сыгранный ход
+            current_side
+        )
         
         tags = drill.get('tags', '').split(',')
         tag_text = ', '.join([f"#{tag}" for tag in tags if tag.strip()])
@@ -1008,7 +1037,7 @@ async def drill_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка ответа пользователя"""
-    user_id = update.from_user.id
+    user_id = update.message.from_user.id
     
     if user_id not in bot.user_sessions:
         await update.message.reply_text(
